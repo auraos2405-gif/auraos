@@ -1,0 +1,6 @@
+{
+  "buildCommand": "npm run build --workspace=@aura/frontend",
+  "outputDirectory": "apps/frontend/dist",
+  "framework": "vite"
+}
+
