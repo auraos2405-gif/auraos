@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
+apps/frontend/vite.config.js
+apps/frontend/vite.config.d.ts
+.DS_Store
+.vercel/
+.railway/
+apps/backend/prisma/dev.db
