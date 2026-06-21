@@ -1,0 +1,363 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EmpresaStatus {
+  ATIVA
+  INATIVA
+  SUSPENSA
+}
+
+enum TokenTipo {
+  RECUPERACAO_SENHA
+  CONVITE
+}
+
+enum AuraClassificacao {
+  CRITICO
+  RISCO
+  ATENCAO
+  SAUDAVEL
+  EXCELENTE
+}
+
+enum AlertaSeveridade {
+  BAIXA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum RecomendacaoStatus {
+  ATIVA
+  CONCLUIDA
+  IGNORADA
+}
+
+enum CategoriaTipo {
+  RECEITA
+  DESPESA
+}
+
+enum ContaPagarStatus {
+  PENDENTE
+  PAGO
+  VENCIDO
+  CANCELADO
+}
+
+enum ContaReceberStatus {
+  PENDENTE
+  RECEBIDO
+  VENCIDO
+  CANCELADO
+}
+
+model Empresa {
+  id           String        @id @default(uuid()) @db.Uuid
+  nome         String
+  nomeFantasia String?       @map("nome_fantasia")
+  cnpj         String?       @unique
+  email        String      @unique
+  telefone     String?
+  plano        String        @default("foundation")
+  status       EmpresaStatus @default(ATIVA)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt    DateTime?     @map("deleted_at") @db.Timestamptz(3)
+  usuarios     Usuario[]
+  sessoes      Sessao[]
+  tokens       TokenAcao[]
+  auditorias   Auditoria[]
+  indicesAura  AuraIndice[]
+  alertasAura  AuraAlerta[]
+  recomendacoesAura AuraRecomendacao[]
+  categorias    Categoria[]
+  fornecedores Fornecedor[]
+  clientes      Cliente[]
+  contasPagar   ContaPagar[]
+  contasReceber ContaReceber[]
+
+  @@map("empresas")
+}
+
+model Categoria {
+  id            String        @id @default(uuid()) @db.Uuid
+  empresaId     String        @map("empresa_id") @db.Uuid
+  nome          String
+  tipo          CategoriaTipo
+  ativo         Boolean       @default(true)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt     DateTime?     @map("deleted_at") @db.Timestamptz(3)
+  empresa       Empresa       @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  contasPagar   ContaPagar[]  @relation("CategoriaContasPagar")
+  contasReceber ContaReceber[] @relation("CategoriaContasReceber")
+
+  @@index([empresaId, tipo, ativo])
+  @@index([empresaId, deletedAt])
+  @@map("categorias")
+}
+
+model Fornecedor {
+  id           String       @id @default(uuid()) @db.Uuid
+  empresaId    String       @map("empresa_id") @db.Uuid
+  nome         String
+  documento    String?
+  email        String?
+  telefone     String?
+  observacoes  String?
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt    DateTime?    @map("deleted_at") @db.Timestamptz(3)
+  empresa      Empresa      @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  contasPagar  ContaPagar[]
+
+  @@index([empresaId, nome])
+  @@index([empresaId, documento])
+  @@map("fornecedores")
+}
+
+model Cliente {
+  id            String         @id @default(uuid()) @db.Uuid
+  empresaId     String         @map("empresa_id") @db.Uuid
+  nome          String
+  documento     String?
+  email         String?
+  telefone      String?
+  observacoes   String?
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt     DateTime?      @map("deleted_at") @db.Timestamptz(3)
+  empresa       Empresa        @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  contasReceber ContaReceber[]
+
+  @@index([empresaId, nome])
+  @@index([empresaId, documento])
+  @@map("clientes")
+}
+
+model ContaPagar {
+  id             String           @id @default(uuid()) @db.Uuid
+  empresaId      String           @map("empresa_id") @db.Uuid
+  fornecedorId   String           @map("fornecedor_id") @db.Uuid
+  categoriaId    String           @map("categoria_id") @db.Uuid
+  descricao      String
+  valor          Decimal          @db.Decimal(15, 2)
+  emissao        DateTime         @db.Date
+  vencimento     DateTime         @db.Date
+  status         ContaPagarStatus @default(PENDENTE)
+  linhaDigitavel String?          @map("linha_digitavel")
+  pixCopiaCola   String?          @map("pix_copia_cola")
+  observacoes    String?
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime?        @map("deleted_at") @db.Timestamptz(3)
+  empresa        Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  fornecedor     Fornecedor       @relation(fields: [fornecedorId], references: [id], onDelete: Restrict)
+  categoria      Categoria        @relation("CategoriaContasPagar", fields: [categoriaId], references: [id], onDelete: Restrict)
+
+  @@index([empresaId, status, vencimento])
+  @@index([empresaId, fornecedorId])
+  @@index([empresaId, categoriaId])
+  @@map("contas_pagar")
+}
+
+model ContaReceber {
+  id            String              @id @default(uuid()) @db.Uuid
+  empresaId     String              @map("empresa_id") @db.Uuid
+  clienteId     String              @map("cliente_id") @db.Uuid
+  categoriaId   String              @map("categoria_id") @db.Uuid
+  descricao     String
+  valor         Decimal             @db.Decimal(15, 2)
+  emissao       DateTime            @db.Date
+  vencimento    DateTime            @db.Date
+  status        ContaReceberStatus  @default(PENDENTE)
+  observacoes   String?
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt     DateTime?           @map("deleted_at") @db.Timestamptz(3)
+  empresa       Empresa             @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  cliente       Cliente             @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  categoria     Categoria           @relation("CategoriaContasReceber", fields: [categoriaId], references: [id], onDelete: Restrict)
+
+  @@index([empresaId, status, vencimento])
+  @@index([empresaId, clienteId])
+  @@index([empresaId, categoriaId])
+  @@map("contas_receber")
+}
+
+model AuraIndice {
+  id               String             @id @default(uuid()) @db.Uuid
+  empresaId        String             @map("empresa_id") @db.Uuid
+  score            Int
+  classificacao    AuraClassificacao
+  contasVencidas   Int                @map("contas_vencidas")
+  contasAVencer    Int                @map("contas_a_vencer")
+  liquidez         Decimal            @db.Decimal(15, 2)
+  recebimentos     Decimal            @db.Decimal(15, 2)
+  pagamentos       Decimal            @db.Decimal(15, 2)
+  fluxoProjetado   Decimal            @map("fluxo_projetado") @db.Decimal(15, 2)
+  componentes      Json
+  periodoDias      Int                @default(30) @map("periodo_dias")
+  calculadoEm      DateTime           @default(now()) @map("calculado_em") @db.Timestamptz(3)
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt        DateTime?          @map("deleted_at") @db.Timestamptz(3)
+  empresa          Empresa            @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+
+  @@index([empresaId, calculadoEm])
+  @@map("aura_indices")
+}
+
+model AuraAlerta {
+  id          String           @id @default(uuid()) @db.Uuid
+  empresaId   String           @map("empresa_id") @db.Uuid
+  titulo      String
+  descricao   String
+  severidade  AlertaSeveridade
+  origem      String
+  evidencia   Json?
+  lido        Boolean          @default(false)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime?        @map("deleted_at") @db.Timestamptz(3)
+  empresa     Empresa          @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+
+  @@index([empresaId, lido, createdAt])
+  @@index([empresaId, severidade])
+  @@map("aura_alertas")
+}
+
+model AuraRecomendacao {
+  id              String              @id @default(uuid()) @db.Uuid
+  empresaId       String              @map("empresa_id") @db.Uuid
+  titulo          String
+  observacao      String
+  impacto         String
+  recomendacao    String
+  motivo          String
+  dadosUtilizados Json                @map("dados_utilizados")
+  confidenceScore Decimal             @map("confidence_score") @db.Decimal(3, 2)
+  origem          String
+  prioridade      Int                 @default(0)
+  status          RecomendacaoStatus  @default(ATIVA)
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt       DateTime?           @map("deleted_at") @db.Timestamptz(3)
+  empresa         Empresa             @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+
+  @@index([empresaId, status, prioridade])
+  @@index([empresaId, createdAt])
+  @@map("aura_recomendacoes")
+}
+
+model Usuario {
+  id           String      @id @default(uuid()) @db.Uuid
+  empresaId    String      @map("empresa_id") @db.Uuid
+  nome         String
+  email        String      @unique
+  senhaHash    String      @map("senha_hash")
+  cargo        String?
+  avatar       String?
+  ultimoAcesso DateTime?   @map("ultimo_acesso") @db.Timestamptz(3)
+  ativo        Boolean     @default(true)
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt    DateTime?   @map("deleted_at") @db.Timestamptz(3)
+  empresa      Empresa     @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  permissoes   Permissao[]
+  sessoes      Sessao[]
+  tokens       TokenAcao[]
+  auditorias   Auditoria[]
+
+  @@unique([empresaId, email])
+  @@index([empresaId])
+  @@index([empresaId, deletedAt])
+  @@map("usuarios")
+}
+
+model Permissao {
+  id        String   @id @default(uuid()) @db.Uuid
+  empresaId String   @map("empresa_id") @db.Uuid
+  usuarioId String   @map("usuario_id") @db.Uuid
+  modulo    String
+  visualizar Boolean @default(false)
+  criar      Boolean @default(false)
+  editar     Boolean @default(false)
+  excluir    Boolean @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@unique([empresaId, usuarioId, modulo])
+  @@index([empresaId])
+  @@map("permissoes")
+}
+
+model Sessao {
+  id               String    @id @default(uuid()) @db.Uuid
+  empresaId        String    @map("empresa_id") @db.Uuid
+  usuarioId        String    @map("usuario_id") @db.Uuid
+  tokenHash        String    @unique @map("token_hash")
+  familia          String    @db.Uuid
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(3)
+  replacedByHash   String?   @map("replaced_by_hash")
+  ip               String?
+  userAgent        String?   @map("user_agent")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(3)
+  empresa          Empresa   @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  usuario          Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([empresaId, usuarioId])
+  @@index([expiresAt])
+  @@map("sessoes")
+}
+
+model TokenAcao {
+  id        String    @id @default(uuid()) @db.Uuid
+  empresaId String    @map("empresa_id") @db.Uuid
+  usuarioId String    @map("usuario_id") @db.Uuid
+  tipo      TokenTipo
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  empresa   Empresa   @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([empresaId, usuarioId, tipo])
+  @@index([expiresAt])
+  @@map("tokens_acao")
+}
+
+model Auditoria {
+  id         String   @id @default(uuid()) @db.Uuid
+  empresaId  String   @map("empresa_id") @db.Uuid
+  usuarioId  String?  @map("usuario_id") @db.Uuid
+  acao       String
+  tabela     String
+  registroId String?  @map("registro_id") @db.Uuid
+  dados      Json?
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  requestId  String?  @map("request_id")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  empresa    Empresa  @relation(fields: [empresaId], references: [id], onDelete: Restrict)
+  usuario    Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([empresaId, createdAt])
+  @@index([empresaId, usuarioId])
+  @@map("auditoria")
+}
